@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (snd_pcm_open(&pcm_handle, /*"default"*/ "plughw:1,0", SND_PCM_STREAM_PLAYBACK, 0) < 0) {
+	if (snd_pcm_open(&pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0) < 0) {
 		printf("Failed opening device\n");
 		return 1;
 	}
