@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <errno.h>
+#include <getopt.h>
 #include <time.h>
 #include <sys/time.h>
 #include <alsa/asoundlib.h>
@@ -20,6 +21,9 @@
 static uint8_t tone1[TONE_SIZE];
 static uint8_t tone2[TONE_SIZE];
 static const uint8_t silence[BUFFER_SIZE];
+
+static int bpm = 120;
+static const char *pattern = "1222";
 
 static int set_params(snd_pcm_t *pcm_handle)
 {
@@ -143,9 +147,51 @@ static int play(snd_pcm_t *pcm_handle, const char *pattern, int bpm)
 	}
 }
 
-int main()
+static void usage(const char *name)
+{
+	printf("Usage: %s [OPTION]\n", name);
+	printf("  -b, --bpm=N             Set beats per minute\n");
+	printf("  -p, --pattern=PATTERN   Set beeping pattern (e.g. 1222)\n");
+}
+
+static int parse_cmdline(int argc, char *argv[])
+{
+	int opt;
+	struct option options[] = {
+		{"help", no_argument, 0, 'h'},
+		{"bpm", required_argument, 0, 'b'},
+		{"pattern", required_argument, 0, 'p'},
+		{0, 0, 0, 0},
+	};
+
+	while ((opt = getopt_long(argc, argv, "hb:p:", options, NULL)) != -1) {
+		switch(opt) {
+			case 'b':
+				if (sscanf(optarg, "%d", &bpm) != 1) {
+					return -1;
+				}
+				break;
+			case 'p':
+				pattern = strdup(optarg);
+				break;
+			case 'h':
+			default:
+				return -1;
+		}
+
+	}
+
+	return 0;
+}
+
+int main(int argc, char *argv[])
 {
 	snd_pcm_t *pcm_handle;
+
+	if (parse_cmdline(argc, argv) < 0) {
+		usage(argv[0]);
+		return 1;
+	}
 
 	if (snd_pcm_open(&pcm_handle, /*"default"*/ "plughw:1,0", SND_PCM_STREAM_PLAYBACK, 0) < 0) {
 		printf("Failed opening device\n");
@@ -157,7 +203,7 @@ int main()
 	}
 
 	prepare_tones();
-	play(pcm_handle, "2111", 120);
+	play(pcm_handle, pattern, bpm);
 
 	snd_pcm_close(pcm_handle);
 
