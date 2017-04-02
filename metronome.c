@@ -142,8 +142,6 @@ static int play(snd_pcm_t *pcm_handle, const char *pattern, int bpm)
 		} else {
 			play_tone(pcm_handle, 's');
 		}
-
-		usleep(500);
 	}
 }
 
