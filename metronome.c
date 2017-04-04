@@ -25,7 +25,7 @@ static const uint8_t silence[BUFFER_SIZE];
 static int bpm = 120;
 static const char *pattern = "1222";
 
-static int set_params(snd_pcm_t *pcm_handle)
+static int set_alsa_params(snd_pcm_t *pcm_handle)
 {
 	snd_pcm_hw_params_t *hwparams;
 	unsigned int rate = SAMPLE_RATE;
@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (set_params(pcm_handle) < 0) {
+	if (set_alsa_params(pcm_handle) < 0) {
 		return 1;
 	}
 
