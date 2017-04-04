@@ -53,31 +53,31 @@ static int set_alsa_params(snd_pcm_t *pcm_handle)
 	snd_pcm_hw_params_alloca(&hwparams);
 
 	if (snd_pcm_hw_params_any(pcm_handle, hwparams) < 0) {
-		printf("Failed configuring device\n");
+		fprintf(stderr, "Failed configuring device\n");
 		return -1;
 	}
 	if (snd_pcm_hw_params_set_access(pcm_handle, hwparams, SND_PCM_ACCESS_RW_INTERLEAVED) < 0) {
-		printf("Failed setting access mode\n");
+		fprintf(stderr, "Failed setting access mode\n");
 		return -1;
 	}
 	if (snd_pcm_hw_params_set_format(pcm_handle, hwparams, SND_PCM_FORMAT_S16_LE) < 0) {
-		printf("Failed setting format\n");
+		fprintf(stderr, "Failed setting format\n");
 		return -1;
 	}
 	if (snd_pcm_hw_params_set_rate_near(pcm_handle, hwparams, &rate, 0) < 0) {
-		printf("Failed setting sample rate\n");
+		fprintf(stderr, "Failed setting sample rate\n");
 		return -1;
 	}
 	if (snd_pcm_hw_params_set_buffer_size_near(pcm_handle, hwparams, &bufsize) < 0) {
-		printf("Failed setting sample rate\n");
+		fprintf(stderr, "Failed setting sample rate\n");
 		return -1;
 	}
 	if (snd_pcm_hw_params_set_channels(pcm_handle, hwparams, 1) < 0) {
-		printf("Failed setting channel number\n");
+		fprintf(stderr, "Failed setting channel number\n");
 		return -1;
 	}
 	if (snd_pcm_hw_params(pcm_handle, hwparams) < 0) {
-		printf("Failed applying hardware parameters\n");
+		fprintf(stderr, "Failed applying hardware parameters\n");
 		return -1;
 	}
 
@@ -92,7 +92,7 @@ static int toggle_nonblocking_input()
 	if (saved_termios) {
 		/* restore old settings */
 		if ((ret = tcsetattr(STDIN_FILENO, TCSANOW, saved_termios)) < 0) {
-			printf("Failed restoring termios settings: %s\n", strerror(errno));
+			fprintf(stderr, "Failed restoring termios settings: %s\n", strerror(errno));
 		}
 		free(saved_termios);
 		saved_termios = NULL;
@@ -105,7 +105,7 @@ static int toggle_nonblocking_input()
 		/* get and backup current settings */
 		saved_termios = malloc(sizeof(struct termios));
 		if (tcgetattr(STDIN_FILENO, saved_termios) < 0) {
-			printf("Failed retrieving current termios setings: %s\n", strerror(errno));
+			fprintf(stderr, "Failed retrieving current termios setings: %s\n", strerror(errno));
 			free(saved_termios);
 			saved_termios = NULL;
 			return -1;
@@ -116,7 +116,7 @@ static int toggle_nonblocking_input()
 		new_termios.c_lflag &= ~(ICANON | ECHO);
 
 		if ((ret = tcsetattr(STDIN_FILENO, TCSANOW, &new_termios)) < 0) {
-			printf("Failed setting to changed termios: %s\n", strerror(errno));
+			fprintf(stderr, "Failed setting to changed termios: %s\n", strerror(errno));
 		}
 
 		/* disable cursor */
@@ -137,7 +137,7 @@ static int input_available()
 
 	count = select(STDIN_FILENO+1, &inputs, NULL, NULL, &timeout);
 	if (count == -1) {
-		printf("Failed checking stdin status: %s\n", strerror(errno));
+		fprintf(stderr, "Failed checking stdin status: %s\n", strerror(errno));
 		return 0;
 	}
 
@@ -164,10 +164,9 @@ static void handle_keypress(char c)
 static void prepare_tones()
 {
 	int i, amplitude = 20;
-	uint16_t sample;
 
 	for(i=0; i<TONE_SIZE-1; i++) {
-		sample = amplitude * sin(2*M_PI*TONE1_FREQ*i/SAMPLE_RATE);
+		uint16_t sample = amplitude * sin(2*M_PI*TONE1_FREQ*i/SAMPLE_RATE);
 		tone1[i] = sample % 256;
 		tone1[i+1] = sample >> 8;
 		sample = amplitude * sin(2*M_PI*TONE2_FREQ*i/SAMPLE_RATE);
@@ -233,7 +232,7 @@ static void play(snd_pcm_t *pcm_handle, const char *pattern)
 		}
 
 		if (clock_gettime(CLOCK_MONOTONIC, &cur_t) == -1) {
-			printf("Failed getting time: %s\n", strerror(errno));
+			fprintf(stderr, "Failed getting time: %s\n", strerror(errno));
 			return;
 		}
 
@@ -297,7 +296,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (snd_pcm_open(&pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0) < 0) {
-		printf("Failed opening device\n");
+		fprintf(stderr, "Failed opening device\n");
 		return 1;
 	}
 
