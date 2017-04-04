@@ -31,6 +31,12 @@ static const uint8_t silence[BUFFER_SIZE];
 static int bpm = 120;
 static const char *pattern = "1222";
 
+static void instructions()
+{
+	printf("\rPress: (q)uit, (+) faster, (-) slower.  State: %d bpm    ", bpm);
+	fflush(stdout);
+}
+
 static int set_alsa_params(snd_pcm_t *pcm_handle)
 {
 	snd_pcm_hw_params_t *hwparams;
@@ -130,7 +136,15 @@ static int handle_keypress(char c)
 	switch(c) {
 		case 'q':
 			return -1;
+		case '+':
+			bpm++;
+			break;
+		case '-':
+			bpm--;
+			break;
 	}
+
+	instructions();
 
 	return 0;
 }
@@ -282,8 +296,10 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	instructions();
 	prepare_tones();
 	play(pcm_handle, pattern, bpm);
+	printf("\n");
 
 	snd_pcm_close(pcm_handle);
 
