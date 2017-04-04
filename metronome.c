@@ -1,11 +1,15 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <errno.h>
 #include <getopt.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/select.h>
+#include <termios.h>
+#include <unistd.h>
 #include <alsa/asoundlib.h>
 
 #define SAMPLE_RATE 8000
@@ -60,6 +64,70 @@ static int set_alsa_params(snd_pcm_t *pcm_handle)
 	if (snd_pcm_hw_params(pcm_handle, hwparams) < 0) {
 		printf("Failed applying hardware parameters\n");
 		return -1;
+	}
+
+	return 0;
+}
+
+static int toggle_nonblocking_input()
+{
+	static struct termios *saved_termios = NULL;
+	int ret = 0;
+
+	if (saved_termios) {
+		/* restore old settings */
+		if ((ret = tcsetattr(STDIN_FILENO, TCSANOW, saved_termios)) < 0) {
+			printf("Failed restoring termios settings: %s\n", strerror(errno));
+		}
+		free(saved_termios);
+		saved_termios = NULL;
+	} else {
+		struct termios new_termios;
+
+		/* get and backup current settings */
+		saved_termios = malloc(sizeof(struct termios));
+		if (tcgetattr(STDIN_FILENO, saved_termios) < 0) {
+			printf("Failed retrieving current termios setings: %s\n", strerror(errno));
+			free(saved_termios);
+			saved_termios = NULL;
+			return -1;
+		}
+		memcpy(&new_termios, saved_termios, sizeof(struct termios));
+
+		/* disable echo and canonical mode (line by line input; line editing) */
+		new_termios.c_lflag &= ~(ICANON | ECHO);
+
+		if ((ret = tcsetattr(STDIN_FILENO, TCSANOW, &new_termios)) < 0) {
+			printf("Failed setting to changed termios: %s\n", strerror(errno));
+		}
+	}
+
+	return ret;
+}
+
+static int input_available()
+{
+	struct timeval timeout = {0, 0};
+	int count;
+	fd_set inputs;
+
+	FD_ZERO(&inputs);
+	FD_SET(STDIN_FILENO, &inputs);
+
+	count = select(STDIN_FILENO+1, &inputs, NULL, NULL, &timeout);
+	if (count == -1) {
+		printf("Failed checking stdin status: %s\n", strerror(errno));
+		return 0;
+	}
+
+	return count == 1 && FD_ISSET(STDIN_FILENO, &inputs);
+}
+
+static int handle_keypress(char c)
+{
+	switch(c) {
+		case 'q':
+			return -1;
 	}
 
 	return 0;
@@ -131,6 +199,14 @@ static int play(snd_pcm_t *pcm_handle, const char *pattern, int bpm)
 	play_tone(pcm_handle, 's');
 
 	while(1) {
+		if (input_available()) {
+			char c;
+			read(STDIN_FILENO, &c, 1);
+			if (handle_keypress(c) < 0) {
+				return 0;
+			}
+		}
+
 		if (clock_gettime(CLOCK_MONOTONIC, &cur_t) == -1) {
 			printf("Failed getting time: %s\n", strerror(errno));
 			return -1;
@@ -191,6 +267,10 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if (toggle_nonblocking_input() < 0) {
+		return 1;
+	}
+
 	if (snd_pcm_open(&pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0) < 0) {
 		printf("Failed opening device\n");
 		return 1;
@@ -204,6 +284,10 @@ int main(int argc, char *argv[])
 	play(pcm_handle, pattern, bpm);
 
 	snd_pcm_close(pcm_handle);
+
+	if (toggle_nonblocking_input() < 0) {
+		return 1;
+	}
 
 	return 0;
 }
