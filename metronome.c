@@ -89,6 +89,9 @@ static int toggle_nonblocking_input()
 		}
 		free(saved_termios);
 		saved_termios = NULL;
+
+		/* restore cursor */
+		fprintf(stderr, "\033[?25h");
 	} else {
 		struct termios new_termios;
 
@@ -108,6 +111,9 @@ static int toggle_nonblocking_input()
 		if ((ret = tcsetattr(STDIN_FILENO, TCSANOW, &new_termios)) < 0) {
 			printf("Failed setting to changed termios: %s\n", strerror(errno));
 		}
+
+		/* disable cursor */
+		fprintf(stderr, "\033[?25l");
 	}
 
 	return ret;
