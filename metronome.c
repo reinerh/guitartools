@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <time.h>
+#include <signal.h>
 #include <sys/time.h>
 #include <sys/select.h>
 #include <termios.h>
@@ -28,8 +29,14 @@ static uint8_t tone1[TONE_SIZE];
 static uint8_t tone2[TONE_SIZE];
 static const uint8_t silence[BUFFER_SIZE];
 
+static int playing = 1;
 static int bpm = 120;
 static const char *pattern = "1222";
+
+static void handle_signals(int signum __attribute__((unused)))
+{
+	playing = 0;
+}
 
 static void instructions()
 {
@@ -137,11 +144,12 @@ static int input_available()
 	return count == 1 && FD_ISSET(STDIN_FILENO, &inputs);
 }
 
-static int handle_keypress(char c)
+static void handle_keypress(char c)
 {
 	switch(c) {
 		case 'q':
-			return -1;
+			playing = 0;
+			break;
 		case '+':
 			bpm++;
 			break;
@@ -151,8 +159,6 @@ static int handle_keypress(char c)
 	}
 
 	instructions();
-
-	return 0;
 }
 
 static void prepare_tones()
@@ -208,7 +214,7 @@ static void play_tone(snd_pcm_t *pcm_handle, char tone)
 	}
 }
 
-static int play(snd_pcm_t *pcm_handle, const char *pattern)
+static void play(snd_pcm_t *pcm_handle, const char *pattern)
 {
 	int i = 0;
 	struct timespec cur_t, old_t = {};
@@ -217,20 +223,18 @@ static int play(snd_pcm_t *pcm_handle, const char *pattern)
 	snd_pcm_prepare(pcm_handle);
 	play_tone(pcm_handle, 's');
 
-	while(1) {
+	while(playing) {
 		double period_us = 1000000 * 60.0 / bpm;
 
 		if (input_available()) {
 			char c;
 			read(STDIN_FILENO, &c, 1);
-			if (handle_keypress(c) < 0) {
-				return 0;
-			}
+			handle_keypress(c);
 		}
 
 		if (clock_gettime(CLOCK_MONOTONIC, &cur_t) == -1) {
 			printf("Failed getting time: %s\n", strerror(errno));
-			return -1;
+			return;
 		}
 
 		if (timediff_us(&cur_t, &old_t) >= period_us) {
@@ -300,6 +304,9 @@ int main(int argc, char *argv[])
 	if (set_alsa_params(pcm_handle) < 0) {
 		return 1;
 	}
+
+	signal(SIGINT, handle_signals);
+	signal(SIGTERM, handle_signals);
 
 	instructions();
 	prepare_tones();
