@@ -130,7 +130,7 @@ static int input_available()
 {
 	struct timeval timeout = {0, 0};
 	int count;
-	fd_set inputs;
+	fd_set inputs = {};
 
 	FD_ZERO(&inputs);
 	FD_SET(STDIN_FILENO, &inputs);
