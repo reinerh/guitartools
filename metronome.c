@@ -202,19 +202,18 @@ static void play_tone(snd_pcm_t *pcm_handle, char tone)
 	}
 }
 
-static int play(snd_pcm_t *pcm_handle, const char *pattern, int bpm)
+static int play(snd_pcm_t *pcm_handle, const char *pattern)
 {
 	int i = 0;
-	double period_us;
 	struct timespec cur_t, old_t = {};
-
-	period_us = 1000000 * 60.0 / bpm;
 
 	/* fill buffer with silence */
 	snd_pcm_prepare(pcm_handle);
 	play_tone(pcm_handle, 's');
 
 	while(1) {
+		double period_us = 1000000 * 60.0 / bpm;
+
 		if (input_available()) {
 			char c;
 			read(STDIN_FILENO, &c, 1);
@@ -298,7 +297,7 @@ int main(int argc, char *argv[])
 
 	instructions();
 	prepare_tones();
-	play(pcm_handle, pattern, bpm);
+	play(pcm_handle, pattern);
 	printf("\n");
 
 	snd_pcm_close(pcm_handle);
