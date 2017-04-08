@@ -2,12 +2,16 @@
 
 #include <stdio.h>
 #include <signal.h>
+#include <math.h>
+#include <limits.h>
 #include <complex.h>
 #include <fftw3.h>
 #include <alsa/asoundlib.h>
 
 #define SAMPLE_RATE 8000
 #define FFT_SIZE (1<<13)
+
+#define ACCURACY 1.0 // Hz
 
 static double *fft_in;
 static fftw_complex *fft_out;
@@ -74,10 +78,46 @@ static void fft_cleanup()
 	fftw_free(fft_out);
 }
 
+static void find_note(double freq)
+{
+	int i, index = 0, dir = 0;
+	char note = '?';
+
+	/*                                E,     A,      D,      G,      B,      e                 */
+	const double notes[] = { INT_MIN, 82.41, 110.00, 146.83, 196.00, 246.94, 329.63, INT_MAX };
+	const char *note_str = "?EADGBe?";
+
+	for (i=0; i<7; i++) {
+		if (freq > notes[i+1]) {
+			continue;
+		}
+		printf("%f  %f\n", freq, (notes[i] + notes[i+1])/2);
+		if (freq > (notes[i] + notes[i+1])/2) {
+			note = note_str[i+1];
+			dir = -1;
+			index = i+1;
+		} else {
+			note = note_str[i];
+			dir = +1;
+			index = i;
+		}
+		break;
+	}
+
+	if (fabs(freq - notes[index]) < ACCURACY) {
+		dir = 0;
+	}
+
+	if (dir < 0) printf(">");
+	printf("%c", note);
+	if (dir > 0) printf("<");
+	printf("\n");
+}
+
 static void process_frames()
 {
-	int i, freq, index = -1;
-	double largest = -1;
+	int i, index = -1;
+	double largest = -1, freq;
 
 	fftw_execute(fft_plan);
 
@@ -90,15 +130,15 @@ static void process_frames()
 			index = i;
 		}
 	}
-	freq = index * SAMPLE_RATE / FFT_SIZE;
-	printf("freq: %d Hz\n", freq);
+	freq = (float)index * SAMPLE_RATE / FFT_SIZE;
+	printf("freq: %f Hz\n", freq);
+	find_note(freq);
 }
 
 static void capture(snd_pcm_t *pcm_handle)
 {
-	int read;
-
 	while(capturing) {
+		int read;
 		while ((read = snd_pcm_readi(pcm_handle, fft_in, FFT_SIZE)) < 0) {
 			snd_pcm_prepare(pcm_handle);
 			printf("overrun\n");
