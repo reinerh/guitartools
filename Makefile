@@ -1,5 +1,5 @@
 CFLAGS = -Wall -Wextra -Werror -ggdb3 -O3
-LDFLAGS = -lasound -lm -lrt
+LDFLAGS = -lasound -lfftw3 -lm -lrt
 
 METRONOME_OBJS = metronome.o
 METRONOME_BIN = metronome

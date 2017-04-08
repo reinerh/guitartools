@@ -2,10 +2,16 @@
 
 #include <stdio.h>
 #include <signal.h>
+#include <complex.h>
+#include <fftw3.h>
 #include <alsa/asoundlib.h>
 
 #define SAMPLE_RATE 8000
-#define BUFFER_SIZE 4096
+#define FFT_SIZE (1<<13)
+
+static double *fft_in;
+static fftw_complex *fft_out;
+static fftw_plan fft_plan;
 
 static int capturing = 1;
 
@@ -18,7 +24,7 @@ static int set_alsa_params(snd_pcm_t *pcm_handle)
 {
 	snd_pcm_hw_params_t *hwparams;
 	unsigned int rate = SAMPLE_RATE;
-	snd_pcm_uframes_t bufsize = BUFFER_SIZE;
+	snd_pcm_uframes_t bufsize = FFT_SIZE;
 
 	snd_pcm_hw_params_alloca(&hwparams);
 
@@ -30,7 +36,7 @@ static int set_alsa_params(snd_pcm_t *pcm_handle)
 		fprintf(stderr, "Failed setting access mode\n");
 		return -1;
 	}
-	if (snd_pcm_hw_params_set_format(pcm_handle, hwparams, SND_PCM_FORMAT_S16_LE) < 0) {
+	if (snd_pcm_hw_params_set_format(pcm_handle, hwparams, SND_PCM_FORMAT_FLOAT64_LE) < 0) {
 		fprintf(stderr, "Failed setting format\n");
 		return -1;
 	}
@@ -54,20 +60,53 @@ static int set_alsa_params(snd_pcm_t *pcm_handle)
 	return 0;
 }
 
+static void fft_init()
+{
+	fft_in = fftw_alloc_real(FFT_SIZE);
+	fft_out = fftw_alloc_complex(FFT_SIZE);
+	fft_plan = fftw_plan_dft_r2c_1d(FFT_SIZE, fft_in, fft_out, FFTW_ESTIMATE);
+}
+
+static void fft_cleanup()
+{
+	fftw_destroy_plan(fft_plan);
+	fftw_free(fft_in);
+	fftw_free(fft_out);
+}
+
+static void process_frames()
+{
+	int i, freq, index = -1;
+	double largest = -1;
+
+	fftw_execute(fft_plan);
+
+	/* find point with largest magnitude */
+	for (i=0; i<FFT_SIZE; i++) {
+		/* +1 because out[0] is DC result */
+		double a = cabs(fft_out[i+1]);
+		if (a > largest) {
+			largest = a;
+			index = i;
+		}
+	}
+	freq = index * SAMPLE_RATE / FFT_SIZE;
+	printf("freq: %d Hz\n", freq);
+}
+
 static void capture(snd_pcm_t *pcm_handle)
 {
-	char tonebuf[BUFFER_SIZE];
-	int n_frames = 0;
-	FILE* f = fopen("capture.raw", "w");
+	int read;
 
 	while(capturing) {
-		while ((n_frames = snd_pcm_readi(pcm_handle, tonebuf, sizeof(tonebuf) / 2)) < 0) {
+		while ((read = snd_pcm_readi(pcm_handle, fft_in, FFT_SIZE)) < 0) {
 			snd_pcm_prepare(pcm_handle);
 			printf("overrun\n");
 		}
-		fwrite(tonebuf, n_frames*2, 1, f);
+		if (read == FFT_SIZE) {
+			process_frames();
+		}
 	}
-	fclose(f);
 }
 
 int main()
@@ -86,9 +125,12 @@ int main()
 	signal(SIGINT, handle_signals);
 	signal(SIGTERM, handle_signals);
 
+	fft_init();
+
 	capture(pcm_handle);
 
 	snd_pcm_close(pcm_handle);
+	fft_cleanup();
 
 	return 0;
 }
