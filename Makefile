@@ -1,18 +1,14 @@
 CFLAGS = -Wall -Wextra -Werror -ggdb3 -O3
-LDFLAGS = -lasound -lfftw3 -lm -lrt
+LDFLAGS = -lasound -lm -lrt
 
-METRONOME_OBJS = metronome.o
-METRONOME_BIN = metronome
-TUNER_OBJS = tuner.o
-TUNER_BIN = tuner
-
-OBJS = $(METRONOME_OBJS) $(TUNER_OBJS)
-BINS = $(METRONOME_BIN) $(TUNER_BIN)
+BINS = metronome tuner
 
 all: $(BINS)
 
-$(METRONOME_BIN): $(METRONOME_OBJS)
-$(TUNER_BIN): $(TUNER_OBJS)
+metronome: metronome.o common.o
+
+tuner: LDFLAGS += -lfftw3
+tuner: tuner.o common.o
 
 clean:
-	rm -f $(OBJS) $(BINS)
+	rm -f *.o $(BINS)

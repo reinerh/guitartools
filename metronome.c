@@ -11,9 +11,9 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <sys/select.h>
-#include <termios.h>
-#include <unistd.h>
 #include <alsa/asoundlib.h>
+
+#include "common.h"
 
 #define SAMPLE_RATE 8000
 
@@ -82,48 +82,6 @@ static int set_alsa_params(snd_pcm_t *pcm_handle)
 	}
 
 	return 0;
-}
-
-static int toggle_nonblocking_input()
-{
-	static struct termios *saved_termios = NULL;
-	int ret = 0;
-
-	if (saved_termios) {
-		/* restore old settings */
-		if ((ret = tcsetattr(STDIN_FILENO, TCSANOW, saved_termios)) < 0) {
-			fprintf(stderr, "Failed restoring termios settings: %s\n", strerror(errno));
-		}
-		free(saved_termios);
-		saved_termios = NULL;
-
-		/* restore cursor */
-		fprintf(stderr, "\033[?25h");
-	} else {
-		struct termios new_termios;
-
-		/* get and backup current settings */
-		saved_termios = malloc(sizeof(struct termios));
-		if (tcgetattr(STDIN_FILENO, saved_termios) < 0) {
-			fprintf(stderr, "Failed retrieving current termios setings: %s\n", strerror(errno));
-			free(saved_termios);
-			saved_termios = NULL;
-			return -1;
-		}
-		memcpy(&new_termios, saved_termios, sizeof(struct termios));
-
-		/* disable echo and canonical mode (line by line input; line editing) */
-		new_termios.c_lflag &= ~(ICANON | ECHO);
-
-		if ((ret = tcsetattr(STDIN_FILENO, TCSANOW, &new_termios)) < 0) {
-			fprintf(stderr, "Failed setting to changed termios: %s\n", strerror(errno));
-		}
-
-		/* disable cursor */
-		fprintf(stderr, "\033[?25l");
-	}
-
-	return ret;
 }
 
 static int input_available()
@@ -243,6 +201,7 @@ static void play(snd_pcm_t *pcm_handle, const char *pattern)
 			play_tone(pcm_handle, 's');
 		}
 	}
+	printf("\n");
 }
 
 static void usage(const char *name)
@@ -310,7 +269,6 @@ int main(int argc, char *argv[])
 	instructions();
 	prepare_tones();
 	play(pcm_handle, pattern);
-	printf("\n");
 
 	snd_pcm_close(pcm_handle);
 

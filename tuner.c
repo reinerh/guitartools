@@ -8,6 +8,8 @@
 #include <fftw3.h>
 #include <alsa/asoundlib.h>
 
+#include "common.h"
+
 #define SAMPLE_RATE 8000
 #define FFT_SIZE (1<<13)
 
@@ -91,7 +93,6 @@ static void find_note(double freq)
 		if (freq > notes[i+1]) {
 			continue;
 		}
-		printf("%f  %f\n", freq, (notes[i] + notes[i+1])/2);
 		if (freq > (notes[i] + notes[i+1])/2) {
 			note = note_str[i+1];
 			dir = -1;
@@ -108,10 +109,8 @@ static void find_note(double freq)
 		dir = 0;
 	}
 
-	if (dir < 0) printf(">");
-	printf("%c", note);
-	if (dir > 0) printf("<");
-	printf("\n");
+	printf("\rNote: %c%c%c   Frequency: %.2f Hz      ", dir<0?'>':' ', note, dir>0?'<':' ', freq);
+	fflush(stdout);
 }
 
 static void process_frames()
@@ -131,7 +130,6 @@ static void process_frames()
 		}
 	}
 	freq = (float)index * SAMPLE_RATE / FFT_SIZE;
-	printf("freq: %f Hz\n", freq);
 	find_note(freq);
 }
 
@@ -147,11 +145,16 @@ static void capture(snd_pcm_t *pcm_handle)
 			process_frames();
 		}
 	}
+	printf("\n");
 }
 
 int main()
 {
 	snd_pcm_t *pcm_handle;
+
+	if (toggle_nonblocking_input() < 0) {
+		return 1;
+	}
 
 	if (snd_pcm_open(&pcm_handle, "default", SND_PCM_STREAM_CAPTURE, 0) < 0) {
 		fprintf(stderr, "Failed opening device for capturing\n");
@@ -166,11 +169,14 @@ int main()
 	signal(SIGTERM, handle_signals);
 
 	fft_init();
-
 	capture(pcm_handle);
 
 	snd_pcm_close(pcm_handle);
 	fft_cleanup();
+
+	if (toggle_nonblocking_input() < 0) {
+		return 1;
+	}
 
 	return 0;
 }
