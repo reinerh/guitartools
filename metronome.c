@@ -69,7 +69,7 @@ static int set_alsa_params(snd_pcm_t *pcm_handle)
 		return -1;
 	}
 	if (snd_pcm_hw_params_set_buffer_size_near(pcm_handle, hwparams, &bufsize) < 0) {
-		fprintf(stderr, "Failed setting sample rate\n");
+		fprintf(stderr, "Failed setting buffer size\n");
 		return -1;
 	}
 	if (snd_pcm_hw_params_set_channels(pcm_handle, hwparams, 1) < 0) {
