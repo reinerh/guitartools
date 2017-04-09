@@ -88,6 +88,22 @@ static void fft_cleanup()
 	fftw_free(fft_out);
 }
 
+static void update_output(double freq, char note, int dir)
+{
+	char note_str[] = "---";
+	char freq_str[20] = "---";
+	char peak_str[20] = "---";
+
+	if (freq >= 0) {
+		snprintf(note_str, sizeof(note_str), "%c%c%c", dir<0 ? '>' : ' ', note, dir>0 ? '<' : ' ');
+		snprintf(freq_str, sizeof(freq_str), "%.2f Hz", freq);
+		snprintf(peak_str, sizeof(peak_str), "%.2f Hz", peak_freq);
+	}
+
+	printf("\rNote: %s   Frequency: %s, Peak: %s          ", note_str, freq_str, peak_str);
+	fflush(stdout);
+}
+
 static void find_note(double freq)
 {
 	int i, index = 0, dir = 0;
@@ -117,8 +133,7 @@ static void find_note(double freq)
 		dir = 0;
 	}
 
-	printf("\rNote: %c%c%c   Frequency: %.2f Hz, Peak: %.2f Hz      ", dir<0?'>':' ', note, dir>0?'<':' ', freq, peak_freq);
-	fflush(stdout);
+	update_output(freq, note, dir);
 }
 
 static void calculate_magnitudes()
