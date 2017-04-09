@@ -194,7 +194,6 @@ static void capture(snd_pcm_t *pcm_handle)
 			printf("overrun\n");
 		}
 		if (read == FFT_SIZE) {
-			apply_hps();
 			process_frames();
 		}
 	}
