@@ -25,9 +25,9 @@
 #define TONE1_FREQ 800
 #define TONE2_FREQ 440
 
-static uint8_t tone1[TONE_SIZE];
-static uint8_t tone2[TONE_SIZE];
-static const uint8_t silence[BUFFER_SIZE];
+static double tone1[TONE_SIZE];
+static double tone2[TONE_SIZE];
+static const double silence[BUFFER_SIZE];
 
 static int playing = 1;
 static int bpm = 120;
@@ -60,7 +60,7 @@ static int set_alsa_params(snd_pcm_t *pcm_handle)
 		fprintf(stderr, "Failed setting access mode\n");
 		return -1;
 	}
-	if (snd_pcm_hw_params_set_format(pcm_handle, hwparams, SND_PCM_FORMAT_S16_LE) < 0) {
+	if (snd_pcm_hw_params_set_format(pcm_handle, hwparams, SND_PCM_FORMAT_FLOAT64_LE) < 0) {
 		fprintf(stderr, "Failed setting format\n");
 		return -1;
 	}
@@ -121,15 +121,11 @@ static void handle_keypress(char c)
 
 static void prepare_tones()
 {
-	int i, amplitude = 20;
+	int i;
 
 	for(i=0; i<TONE_SIZE-1; i++) {
-		uint16_t sample = amplitude * sin(2*M_PI*TONE1_FREQ*i/SAMPLE_RATE);
-		tone1[i] = sample % 256;
-		tone1[i+1] = sample >> 8;
-		sample = amplitude * sin(2*M_PI*TONE2_FREQ*i/SAMPLE_RATE);
-		tone2[i] = sample % 256;
-		tone2[i+1] = sample >> 8;
+		tone1[i] = sin(2*M_PI*TONE1_FREQ*i/SAMPLE_RATE);
+		tone2[i] = sin(2*M_PI*TONE2_FREQ*i/SAMPLE_RATE);
 	}
 }
 
@@ -147,25 +143,25 @@ static long timediff_us(struct timespec *ts1, struct timespec *ts2)
 
 static void play_tone(snd_pcm_t *pcm_handle, char tone)
 {
-	const uint8_t *tonebuf;
-	int tonebuf_size;
+	const double *tonebuf;
+	int n_frames;
 
 	switch(tone) {
 		case '1':
 			tonebuf = tone1;
-			tonebuf_size = sizeof(tone1);
+			n_frames = sizeof(tone1) / sizeof(double);
 			break;
 		case '2':
 			tonebuf = tone2;
-			tonebuf_size = sizeof(tone2);
+			n_frames = sizeof(tone2) / sizeof(double);
 			break;
 		case 's':
 		default:
 			tonebuf = silence;
-			tonebuf_size = sizeof(silence);
+			n_frames = sizeof(silence) / sizeof(double);
 			break;
 	}
-	while (snd_pcm_writei(pcm_handle, tonebuf, tonebuf_size / 2) < 0) {
+	while (snd_pcm_writei(pcm_handle, tonebuf, n_frames) < 0) {
 		snd_pcm_prepare(pcm_handle);
 		printf("underrun\n");
 	}
