@@ -14,6 +14,7 @@
 #define FFT_SIZE (1<<13)
 
 #define ACCURACY 2.0 // Hz
+#define NOISE_FLOOR 30
 
 #define FFT_INDEX_TO_FREQ(i) ((float)i * SAMPLE_RATE / FFT_SIZE)
 
@@ -127,6 +128,10 @@ static void calculate_magnitudes()
 	for (i=0; i<FFT_SIZE-1; i++) {
 		/* +1 because out[0] is DC result */
 		magnitudes[i] = cabs(fft_out[i+1]);
+
+		if (magnitudes[i] < NOISE_FLOOR) {
+			magnitudes[i] = 0.0;
+		}
 
 		/* also find highest magnitude for later informational output */
 		if (magnitudes[i] > magnitudes[max_i]) {
