@@ -13,11 +13,14 @@
 #define SAMPLE_RATE 8000
 #define FFT_SIZE (1<<13)
 
-#define ACCURACY 1.0 // Hz
+#define ACCURACY 2.0 // Hz
 
-static double *fft_in;
+#define FFT_INDEX_TO_FREQ(i) ((float)i * SAMPLE_RATE / FFT_SIZE)
+
+static double *fft_in, *magnitudes, *processed;
 static fftw_complex *fft_out;
 static fftw_plan fft_plan;
+static double peak_freq = -1.0;
 
 static int capturing = 1;
 
@@ -68,6 +71,8 @@ static int set_alsa_params(snd_pcm_t *pcm_handle)
 
 static void fft_init()
 {
+	magnitudes = fftw_alloc_real(FFT_SIZE);
+	processed = fftw_alloc_real(FFT_SIZE);
 	fft_in = fftw_alloc_real(FFT_SIZE);
 	fft_out = fftw_alloc_complex(FFT_SIZE);
 	fft_plan = fftw_plan_dft_r2c_1d(FFT_SIZE, fft_in, fft_out, FFTW_ESTIMATE);
@@ -76,6 +81,8 @@ static void fft_init()
 static void fft_cleanup()
 {
 	fftw_destroy_plan(fft_plan);
+	fftw_free(magnitudes);
+	fftw_free(processed);
 	fftw_free(fft_in);
 	fftw_free(fft_out);
 }
@@ -109,27 +116,67 @@ static void find_note(double freq)
 		dir = 0;
 	}
 
-	printf("\rNote: %c%c%c   Frequency: %.2f Hz      ", dir<0?'>':' ', note, dir>0?'<':' ', freq);
+	printf("\rNote: %c%c%c   Frequency: %.2f Hz, Peak: %.2f Hz      ", dir<0?'>':' ', note, dir>0?'<':' ', freq, peak_freq);
 	fflush(stdout);
+}
+
+static void calculate_magnitudes()
+{
+	int i, max_i = -1;
+
+	for (i=0; i<FFT_SIZE-1; i++) {
+		/* +1 because out[0] is DC result */
+		magnitudes[i] = cabs(fft_out[i+1]);
+
+		/* also find highest magnitude for later informational output */
+		if (magnitudes[i] > magnitudes[max_i]) {
+			max_i = i;
+		}
+	}
+	peak_freq = FFT_INDEX_TO_FREQ(max_i);
+}
+
+static void apply_hps()
+{
+	/* Harmonic Product Spectrum
+	   enhance magnitude of fundamental frequency by multiplying with harmonics/overtones
+	   which can have higher magnitudes than fundamentals */
+
+	int i;
+
+	for (i=0; i<FFT_SIZE; i++) {
+		int j;
+		processed[i] = magnitudes[i];
+		/* next 4 harmonics */
+		for (j=2; j<=5; j++) {
+			if (i*j >= FFT_SIZE) {
+				break;
+			}
+			if (magnitudes[i*j] < 0.00001) {
+				/* too close to zero */
+				continue;
+			}
+			processed[i] *= magnitudes[i*j];
+		}
+	}
 }
 
 static void process_frames()
 {
-	int i, index = -1;
-	double largest = -1, freq;
+	int i, max_i = -1;
+	double freq;
 
 	fftw_execute(fft_plan);
+	calculate_magnitudes();
+	apply_hps();
 
 	/* find point with largest magnitude */
 	for (i=0; i<FFT_SIZE; i++) {
-		/* +1 because out[0] is DC result */
-		double a = cabs(fft_out[i+1]);
-		if (a > largest) {
-			largest = a;
-			index = i;
+		if (processed[i] > processed[max_i]) {
+			max_i = i;
 		}
 	}
-	freq = (float)index * SAMPLE_RATE / FFT_SIZE;
+	freq = FFT_INDEX_TO_FREQ(max_i);
 	find_note(freq);
 }
 
@@ -142,6 +189,7 @@ static void capture(snd_pcm_t *pcm_handle)
 			printf("overrun\n");
 		}
 		if (read == FFT_SIZE) {
+			apply_hps();
 			process_frames();
 		}
 	}
