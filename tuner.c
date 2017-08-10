@@ -25,6 +25,115 @@ static double peak_freq = -1.0;
 
 static int capturing = 1;
 
+struct note {
+	const char *name;
+	double freq;
+};
+
+/* Frequencies taken from Wikipedia
+ * https://de.wikipedia.org/wiki/Frequenzen_der_gleichstufigen_Stimmung
+ */
+struct note note_table[] = {
+	{ "---", 00.0000 },
+	{ "C0 ", 16.3516 },
+	{ "C#0", 17.3239 },
+	{ "D0 ", 18.3540 },
+	{ "D#0", 19.4454 },
+	{ "E0 ", 20.6017 },
+	{ "F0 ", 21.8268 },
+	{ "F#0", 23.1247 },
+	{ "G0 ", 24.4997 },
+	{ "G#0", 25.9565 },
+	{ "A0 ", 27.5000 },
+	{ "A#0", 29.1352 },
+	{ "B0 ", 30.8677 },
+	{ "C1 ", 32.7032 },
+	{ "C#1", 34.6478 },
+	{ "D1 ", 36.7081 },
+	{ "D#1", 38.8909 },
+	{ "E1 ", 41.2034 },
+	{ "F1 ", 43.6535 },
+	{ "F#1", 46.2493 },
+	{ "G1 ", 48.9994 },
+	{ "G#1", 51.9131 },
+	{ "A1 ", 55.0000 },
+	{ "A#1", 58.2705 },
+	{ "B1 ", 61.7354 },
+	{ "C2 ", 65.4064 },
+	{ "C#2", 69.2957 },
+	{ "D2 ", 73.4162 },
+	{ "D#2", 77.7817 },
+	{ "E2 ", 82.4069 },
+	{ "F2 ", 87.3071 },
+	{ "F#2", 92.4986 },
+	{ "G2 ", 97.9989 },
+	{ "G#2", 103.826 },
+	{ "A2 ", 110.000 },
+	{ "A#2", 116.541 },
+	{ "B2 ", 123.471 },
+	{ "C3 ", 130.813 },
+	{ "C#3", 138.591 },
+	{ "D3 ", 146.832 },
+	{ "D#3", 155.563 },
+	{ "E3 ", 164.814 },
+	{ "F3 ", 174.614 },
+	{ "F#3", 184.997 },
+	{ "G3 ", 195.998 },
+	{ "G#3", 207.652 },
+	{ "A3 ", 220.000 },
+	{ "A#3", 233.082 },
+	{ "B3 ", 246.942 },
+	{ "C4 ", 261.626 },
+	{ "C#4", 277.183 },
+	{ "D4 ", 293.665 },
+	{ "D#4", 311.127 },
+	{ "E4 ", 329.628 },
+	{ "F4 ", 349.228 },
+	{ "F#4", 369.994 },
+	{ "G4 ", 391.995 },
+	{ "G#4", 415.305 },
+	{ "A4 ", 440.000 },
+	{ "A#4", 466.164 },
+	{ "B4 ", 493.883 },
+	{ "C5 ", 523.251 },
+	{ "C#5", 554.365 },
+	{ "D5 ", 587.330 },
+	{ "D#5", 622.254 },
+	{ "E5 ", 659.255 },
+	{ "F5 ", 698.456 },
+	{ "F#5", 739.989 },
+	{ "G5 ", 783.991 },
+	{ "G#5", 830.609 },
+	{ "A5 ", 880.000 },
+	{ "A#5", 932.328 },
+	{ "B5 ", 987.767 },
+	{ "C6 ", 1046.50 },
+	{ "C#6", 1108.73 },
+	{ "D6 ", 1174.66 },
+	{ "D#6", 1244.51 },
+	{ "E6 ", 1318.51 },
+	{ "F6 ", 1396.91 },
+	{ "F#6", 1479.98 },
+	{ "G6 ", 1567.98 },
+	{ "G#6", 1661.22 },
+	{ "A6 ", 1760.00 },
+	{ "A#6", 1864.66 },
+	{ "B6 ", 1975.53 },
+	{ "C7 ", 2093.00 },
+	{ "C#7", 2217.46 },
+	{ "D7 ", 2349.32 },
+	{ "D#7", 2489.02 },
+	{ "E7 ", 2637.02 },
+	{ "F7 ", 2793.83 },
+	{ "F#7", 2959.96 },
+	{ "G7 ", 3135.96 },
+	{ "G#7", 3322.44 },
+	{ "A7 ", 3520.00 },
+	{ "A#7", 3729.31 },
+	{ "B7 ", 3951.07 },
+	{ "C8 ", 4186.01 },
+};
+
 static void handle_signals(int signum __attribute__((unused)))
 {
 	capturing = 0;
@@ -88,14 +197,14 @@ static void fft_cleanup()
 	fftw_free(fft_out);
 }
 
-static void update_output(double freq, char note, int dir)
+static void update_output(double freq, const char *note, int dir)
 {
-	char note_str[] = "---";
+	char note_str[] = "-----";
 	char freq_str[20] = "---";
 	char peak_str[20] = "---";
 
 	if (freq >= 0) {
-		snprintf(note_str, sizeof(note_str), "%c%c%c", dir<0 ? '>' : ' ', note, dir>0 ? '<' : ' ');
+		snprintf(note_str, sizeof(note_str), "%c%s%c", dir<0 ? '>' : ' ', note, dir>0 ? '<' : ' ');
 		snprintf(freq_str, sizeof(freq_str), "%.2f Hz", freq);
 		snprintf(peak_str, sizeof(peak_str), "%.2f Hz", peak_freq);
 	}
@@ -106,34 +215,38 @@ static void update_output(double freq, char note, int dir)
 
 static void find_note(double freq)
 {
-	int i, index = 0, dir = 0;
-	char note = '?';
+	int note = 0, dir = 0;
 
-	/*                                E,     A,      D,      G,      B,      e                 */
-	const double notes[] = { INT_MIN, 82.41, 110.00, 146.83, 196.00, 246.94, 329.63, INT_MAX };
-	const char *note_str = "?EADGBe?";
-
-	for (i=0; i<7; i++) {
-		if (freq > notes[i+1]) {
-			continue;
+	if (freq <= note_table[1].freq) {
+		note = 1;
+		dir = -1;
+	} else if (freq >= note_table[ARRAY_SIZE(note_table)-1].freq) {
+		note = ARRAY_SIZE(note_table) - 1;
+		dir = +1;
+	} else {
+		unsigned int i;
+		for (i=0; i<ARRAY_SIZE(note_table)-2; i++) {
+			double center;
+			if (freq > note_table[i+1].freq) {
+				continue;
+			}
+			center = (note_table[i].freq + note_table[i+1].freq) / 2;
+			if (freq > center) {
+				note = i+1;
+				dir = -1;
+			} else {
+				note = i;
+				dir = +1;
+			}
+			break;
 		}
-		if (freq > (notes[i] + notes[i+1])/2) {
-			note = note_str[i+1];
-			dir = -1;
-			index = i+1;
-		} else {
-			note = note_str[i];
-			dir = +1;
-			index = i;
-		}
-		break;
 	}
 
-	if (fabs(freq - notes[index]) < ACCURACY) {
+	if (fabs(freq - note_table[note].freq) < ACCURACY) {
 		dir = 0;
 	}
 
-	update_output(freq, note, dir);
+	update_output(freq, note_table[note].name, dir);
 }
 
 static void calculate_magnitudes()
