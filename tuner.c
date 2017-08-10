@@ -13,7 +13,7 @@
 #define SAMPLE_RATE 8000
 #define FFT_SIZE (1<<13)
 
-#define ACCURACY 2.0 // Hz
+#define ACCURACY 1.0 // Hz
 #define NOISE_FLOOR 30
 
 #define FFT_INDEX_TO_FREQ(i) ((float)i * SAMPLE_RATE / FFT_SIZE)
