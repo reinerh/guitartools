@@ -15,6 +15,7 @@
 
 #define ACCURACY 1.0 // Hz
 #define NOISE_FLOOR 30
+#define MIN_FREQ 10.0 // Hz
 
 #define FFT_INDEX_TO_FREQ(i) ((float)i * SAMPLE_RATE / FFT_SIZE)
 
@@ -217,7 +218,10 @@ static void find_note(double freq)
 {
 	int note = 0, dir = 0;
 
-	if (freq <= note_table[1].freq) {
+	if (freq < MIN_FREQ) {
+		note = 0;
+		dir = 0;
+	} else if (freq <= note_table[1].freq) {
 		note = 1;
 		dir = -1;
 	} else if (freq >= note_table[ARRAY_SIZE(note_table)-1].freq) {
