@@ -210,7 +210,7 @@ static void update_output(double freq, const char *note, int dir)
 		snprintf(peak_str, sizeof(peak_str), "%.2f Hz", peak_freq);
 	}
 
-	printf("\rNote: %s   Frequency: %s, Peak: %s          ", note_str, freq_str, peak_str);
+	printf("\rNote: %s   Frequency: %s, Peak: %s            ", note_str, freq_str, peak_str);
 	fflush(stdout);
 }
 
