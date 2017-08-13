@@ -14,7 +14,7 @@
 #define FFT_SIZE (1<<13)
 
 #define ACCURACY 1.0 // Hz
-#define NOISE_FLOOR 30
+#define NOISE_FLOOR 10
 #define MIN_FREQ 10.0 // Hz
 
 #define FFT_INDEX_TO_FREQ(i) ((float)i * SAMPLE_RATE / FFT_SIZE)
