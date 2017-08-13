@@ -1,0 +1,18 @@
+guitartools
+===========
+
+A collection of small tools that can be useful for guitar players.
+
+It currently includes:
+
+  * metronome: Beep in a specified pattern at a constant speed
+  * tuner: Measure tone frequencies and print nearest note
+
+The tools are using ALSA for playback and recording.
+
+Build dependencies:
+
+  * ALSA (e.g. libasound2-dev)
+  * FFTW 3.x (e.g. libfftw3-dev)
+
+Licensed under GPLv2 or any later version.
